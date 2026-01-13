@@ -212,7 +212,7 @@
             Drop your video here
           </p>
           <p className="text-sm text-[#4A7561]">
-            or click to browse. Supports MP4, MOV, AVI, WebM
+            or click to browse. Supports MP4, MOV, WebM
           </p>
         </div>
       );
@@ -375,10 +375,9 @@
 
     const ProgressIndicator = ({ stage, progress, message }) => {
       const stages = [
-        { id: 'loading-wasm', label: 'Loading', num: 1 },
-        { id: 'extracting', label: 'Extracting', num: 2 },
-        { id: 'stitching', label: 'Stitching', num: 3 },
-        { id: 'complete', label: 'Complete', num: 4 },
+        { id: 'extracting', label: 'Extracting', num: 1 },
+        { id: 'stitching', label: 'Stitching', num: 2 },
+        { id: 'complete', label: 'Complete', num: 3 },
       ];
 
       const getStageIndex = (s) => stages.findIndex(st => st.id === s);
@@ -647,8 +646,6 @@
       const [videoFile, setVideoFile] = useState(null);
       const [videoUrl, setVideoUrl] = useState(null);
       const [videoMetadata, setVideoMetadata] = useState(null);
-      const [ffmpeg, setFFmpeg] = useState(null);
-      const [ffmpegLoaded, setFFmpegLoaded] = useState(false);
       const [stage, setStage] = useState('idle');
       const [progress, setProgress] = useState(0);
       const [message, setMessage] = useState('');
@@ -663,8 +660,6 @@
         resolution: 'medium'
       });
 
-      const videoRef = useRef(null);
-
       // Handle file selection
       const handleFileSelect = async (file) => {
         setError(null);
@@ -678,20 +673,27 @@
         const video = document.createElement('video');
         video.preload = 'metadata';
 
-        await new Promise((resolve, reject) => {
-          video.onloadedmetadata = () => {
-            setVideoMetadata({
-              name: file.name,
-              duration: video.duration,
-              width: video.videoWidth,
-              height: video.videoHeight,
-              size: file.size
-            });
-            resolve();
-          };
-          video.onerror = () => reject(new Error('Failed to load video metadata'));
-          video.src = url;
-        });
+        try {
+          await new Promise((resolve, reject) => {
+            video.onloadedmetadata = () => {
+              setVideoMetadata({
+                name: file.name,
+                duration: video.duration,
+                width: video.videoWidth,
+                height: video.videoHeight,
+                size: file.size
+              });
+              resolve();
+            };
+            video.onerror = () => reject(new Error('Failed to load video. Make sure the format is supported.'));
+            video.src = url;
+          });
+        } catch (err) {
+          setError({ message: err.message, recoverable: true });
+          URL.revokeObjectURL(url);
+          setVideoFile(null);
+          setVideoUrl(null);
+        }
       };
 
       // Remove video
@@ -707,100 +709,54 @@
         setError(null);
       };
 
-      // Load FFmpeg.wasm
-      const loadFFmpeg = async () => {
-        setStage('loading-wasm');
-        setMessage('Loading video processing library...');
-        setProgress(0);
+      // Extract frames using Canvas API (no FFmpeg needed!)
+      const extractFramesCanvas = async (videoUrl, timestamps, onProgress) => {
+        const video = document.createElement('video');
+        video.src = videoUrl;
+        video.muted = true;
+        video.preload = 'auto';
+        video.crossOrigin = 'anonymous';
 
-        try {
-          const { FFmpeg } = await import('https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');
-          const { fetchFile } = await import('https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js');
-
-          const ffmpegInstance = new FFmpeg();
-
-          ffmpegInstance.on('progress', ({ progress: p }) => {
-            // Progress during extraction phase (20-80%)
-            if (stage === 'extracting') {
-              setProgress(20 + Math.round(p * 60));
-            }
-          });
-
-          ffmpegInstance.on('log', ({ message: msg }) => {
-            console.log('[FFmpeg]', msg);
-          });
-
-          setProgress(10);
-          setMessage('Downloading FFmpeg core...');
-
-          await ffmpegInstance.load({
-            coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js',
-            wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm',
-          });
-
-          setFFmpeg(ffmpegInstance);
-          setFFmpegLoaded(true);
-          setProgress(20);
-
-          // Store fetchFile for later use
-          window.__ffmpegFetchFile = fetchFile;
-
-          return ffmpegInstance;
-        } catch (err) {
-          console.error('FFmpeg load error:', err);
-          throw new Error('Failed to load video processing library. Make sure your server has COOP/COEP headers enabled.');
-        }
-      };
-
-      // Extract frames
-      const extractFrames = async (ffmpegInstance) => {
-        setStage('extracting');
-        setMessage('Extracting frames from video...');
-
-        const { duration } = videoMetadata;
-        const numFrames = config.rows * config.cols;
-        const interval = duration / (numFrames + 1);
-        const timestamps = Array.from({ length: numFrames }, (_, i) => (i + 1) * interval);
-
-        const fetchFile = window.__ffmpegFetchFile;
-
-        // Write video to FFmpeg filesystem
-        const videoData = await fetchFile(videoFile);
-        await ffmpegInstance.writeFile('input.mp4', videoData);
+        // Wait for video to be ready
+        await new Promise((resolve, reject) => {
+          video.onloadeddata = resolve;
+          video.onerror = () => reject(new Error('Failed to load video for frame extraction'));
+        });
 
         const frames = [];
 
-        for (let i = 0; i < numFrames; i++) {
-          const timestamp = timestamps[i];
-          const outputName = `frame_${i.toString().padStart(3, '0')}.png`;
+        for (let i = 0; i < timestamps.length; i++) {
+          // Seek to timestamp
+          video.currentTime = timestamps[i];
 
-          setMessage(`Extracting frame ${i + 1} of ${numFrames}...`);
+          // Wait for seek to complete
+          await new Promise((resolve) => {
+            video.onseeked = resolve;
+          });
 
-          await ffmpegInstance.exec([
-            '-ss', timestamp.toFixed(3),
-            '-i', 'input.mp4',
-            '-frames:v', '1',
-            '-q:v', '2',
-            outputName
-          ]);
+          // Small delay to ensure frame is rendered
+          await new Promise(r => setTimeout(r, 50));
 
-          const data = await ffmpegInstance.readFile(outputName);
-          const blob = new Blob([data.buffer], { type: 'image/png' });
+          // Create canvas and draw frame
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(video, 0, 0);
+
+          // Convert to blob
+          const blob = await new Promise((resolve) => {
+            canvas.toBlob(resolve, 'image/png');
+          });
 
           frames.push({
             blob,
-            timestamp,
+            timestamp: timestamps[i],
             index: i
           });
 
-          // Clean up frame file
-          await ffmpegInstance.deleteFile(outputName);
-
-          setProgress(20 + Math.round(((i + 1) / numFrames) * 60));
+          onProgress((i + 1) / timestamps.length);
         }
-
-        // Clean up input file
-        await ffmpegInstance.deleteFile('input.mp4');
 
         return frames;
       };
@@ -809,7 +765,7 @@
       const stitchFrames = async (frames) => {
         setStage('stitching');
         setMessage('Creating contact sheet...');
-        setProgress(80);
+        setProgress(70);
 
         const { rows, cols, showTimestamps, resolution } = config;
 
@@ -866,7 +822,7 @@
             ctx.fillText(timeStr, x + frameWidth / 2, y + frameHeight - bgHeight / 2);
           }
 
-          setProgress(80 + Math.round(((i + 1) / frames.length) * 15));
+          setProgress(70 + Math.round(((i + 1) / frames.length) * 25));
           setMessage(`Stitching frame ${i + 1} of ${frames.length}...`);
         }
 
@@ -881,17 +837,20 @@
         setGridDataUrl(null);
 
         try {
-          // Load FFmpeg if not loaded
-          let ffmpegInstance = ffmpeg;
-          if (!ffmpegLoaded) {
-            ffmpegInstance = await loadFFmpeg();
-          } else {
-            setStage('extracting');
-            setProgress(20);
-          }
+          setStage('extracting');
+          setProgress(0);
+          setMessage('Preparing to extract frames...');
 
-          // Extract frames
-          const frames = await extractFrames(ffmpegInstance);
+          const { duration } = videoMetadata;
+          const numFrames = config.rows * config.cols;
+          const interval = duration / (numFrames + 1);
+          const timestamps = Array.from({ length: numFrames }, (_, i) => (i + 1) * interval);
+
+          // Extract frames using Canvas API
+          const frames = await extractFramesCanvas(videoUrl, timestamps, (p) => {
+            setProgress(Math.round(p * 70));
+            setMessage(`Extracting frame ${Math.round(p * numFrames)} of ${numFrames}...`);
+          });
 
           // Stitch into grid
           const canvas = await stitchFrames(frames);
@@ -923,7 +882,7 @@
         };
       }, [videoUrl]);
 
-      const isGenerating = ['loading-wasm', 'extracting', 'stitching'].includes(stage);
+      const isGenerating = ['extracting', 'stitching'].includes(stage);
       const canGenerate = videoMetadata && !isGenerating;
       const showProgress = isGenerating || stage === 'complete';
 
