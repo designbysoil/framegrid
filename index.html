@@ -69,6 +69,13 @@
       </svg>
     );
 
+    const CopyIcon = () => (
+      <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
+        <path d="M28,10V28H10V10H28m0-2H10a2,2,0,0,0-2,2V28a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V10a2,2,0,0,0-2-2Z"/>
+        <path d="M4,18H2V4A2,2,0,0,1,4,2H18V4H4Z"/>
+      </svg>
+    );
+
     const CloseIcon = () => (
       <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
         <path d="M24,9.4,22.6,8,16,14.6,9.4,8,8,9.4,14.6,16,8,22.6,9.4,24,16,17.4,22.6,24,24,22.6,17.4,16Z"/>
@@ -413,6 +420,8 @@
     // ─────────────────────────────────────────────────────────────────────────────
 
     const ResultCard = ({ dataUrl, canvas, filename }) => {
+      const [copied, setCopied] = React.useState(false);
+
       const download = (format) => {
         if (!canvas) return;
 
@@ -438,6 +447,20 @@
         document.body.removeChild(link);
       };
 
+      const copyToClipboard = async () => {
+        if (!canvas) return;
+        try {
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob })
+          ]);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+          console.error('Failed to copy image:', err);
+        }
+      };
+
       return (
         <div className="bg-white rounded-xl border border-[#E8E8E5] overflow-hidden">
           {/* Image preview - fits entire image */}
@@ -456,6 +479,13 @@
               {canvas ? `${canvas.width} × ${canvas.height}px` : ''}
             </span>
             <div className="flex items-center gap-2">
+              <button
+                onClick={copyToClipboard}
+                className="px-4 py-2 rounded-lg text-sm font-medium border border-[#E8E8E5] text-[#0B241C] hover:bg-[#F4F6F0] transition-colors flex items-center gap-2"
+              >
+                {copied ? <CheckIcon /> : <CopyIcon />}
+                {copied ? 'Copied' : 'Copy'}
+              </button>
               <button
                 onClick={() => download('png')}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-[#11362A] text-white hover:bg-[#0B241C] transition-colors flex items-center gap-2"
@@ -528,7 +558,7 @@
         rows: 3,
         cols: 3,
         showTimestamps: true,
-        resolution: 'medium'
+        resolution: 'low'
       });
 
       // Handle file selection
@@ -640,19 +670,27 @@
 
         const { rows, cols, showTimestamps, resolution } = config;
 
-        // Resolution scale
-        const scale = { low: 0.5, medium: 1.0, high: 1.5 }[resolution];
+        // Target canvas widths for each resolution
+        const targetWidth = { low: 1200, medium: 2400, high: 3600 }[resolution];
 
-        // Load first frame to get dimensions
+        // Fixed spacing (not scaled)
+        const colGap = 20;
+        const margin = 40;
+
+        // Load first frame to get original dimensions
         const firstImg = await createImageBitmap(frames[0].blob);
-        const frameWidth = Math.round(firstImg.width * scale);
-        const frameHeight = Math.round(firstImg.height * scale);
+        const originalWidth = firstImg.width;
+        const originalHeight = firstImg.height;
+
+        // Calculate frame width to achieve target canvas width
+        // targetWidth = cols * frameWidth + (cols - 1) * colGap + margin * 2
+        const frameWidth = Math.round((targetWidth - margin * 2 - (cols - 1) * colGap) / cols);
+        const scale = frameWidth / originalWidth;
+        const frameHeight = Math.round(originalHeight * scale);
 
         // Padding and spacing
-        const colGap = 20;                                   // Between columns
-        const timestampHeight = showTimestamps ? Math.round(40 * scale) : 0;  // Space for timestamp below frame
-        const rowGap = 4 + timestampHeight;                  // Between rows (includes timestamp area)
-        const margin = 40;                                   // Outer margin
+        const timestampHeight = showTimestamps ? 40 : 0;
+        const rowGap = 4 + timestampHeight;
 
         // Canvas dimensions
         const canvasWidth = cols * frameWidth + (cols - 1) * colGap + margin * 2;
