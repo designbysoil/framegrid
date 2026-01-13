@@ -30,7 +30,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useRef, useEffect, useCallback } = React;
+    const { useState, useRef, useEffect } = React;
 
     // =============================================================================
     // FRAMEGRID — VIDEO CONTACT SHEET GENERATOR
@@ -66,26 +66,6 @@
       <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
         <path d="M26,24v4H6V24H4v4a2,2,0,0,0,2,2H26a2,2,0,0,0,2-2V24Z"/>
         <path d="M16,22l6.5-6.5-1.4-1.4-4.1,4.1V2h-2V18.2l-4.1-4.1L9.5,15.5Z"/>
-      </svg>
-    );
-
-    const ZoomInIcon = () => (
-      <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
-        <path d="M19,13H15V9H13v4H9v2h4v4h2V15h4V13Z"/>
-        <path d="M22.45,21A10.87,10.87,0,0,0,25,14,11,11,0,1,0,14,25a10.87,10.87,0,0,0,7-2.55L28.59,30,30,28.59ZM14,23a9,9,0,1,1,9-9A9,9,0,0,1,14,23Z"/>
-      </svg>
-    );
-
-    const ZoomOutIcon = () => (
-      <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
-        <rect x="9" y="13" width="10" height="2"/>
-        <path d="M22.45,21A10.87,10.87,0,0,0,25,14,11,11,0,1,0,14,25a10.87,10.87,0,0,0,7-2.55L28.59,30,30,28.59ZM14,23a9,9,0,1,1,9-9A9,9,0,0,1,14,23Z"/>
-      </svg>
-    );
-
-    const ResetIcon = () => (
-      <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
-        <path d="M18,28A12,12,0,1,0,6,16v6.2l-3.6-3.6L1,20l6,6,6-6-1.4-1.4L8,22.2V16H8A10,10,0,1,1,18,26Z"/>
       </svg>
     );
 
@@ -205,7 +185,7 @@
             onChange={handleFileChange}
             className="hidden"
           />
-          <div className="text-[#4A7561] mb-4">
+          <div className="text-[#4A7561] mb-4 flex justify-center">
             <UploadIcon />
           </div>
           <p className="text-base font-medium text-[#0B241C] mb-2">
@@ -224,23 +204,22 @@
 
     const VideoInfoCard = ({ metadata, onRemove }) => (
       <div className="bg-[#F4F6F0] rounded-xl p-4 border border-[#E8E8E5]">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#11362A] flex items-center justify-center text-white">
-              <VideoIcon />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-[#0B241C] truncate max-w-[200px]">
-                {metadata.name}
-              </p>
-              <p className="text-xs text-[#4A7561]">
-                {formatDuration(metadata.duration)} · {metadata.width}×{metadata.height} · {formatFileSize(metadata.size)}
-              </p>
-            </div>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-[#11362A] flex items-center justify-center text-white flex-shrink-0">
+            <VideoIcon />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-[#0B241C] truncate" title={metadata.name}>
+              {metadata.name}
+            </p>
+            <p className="text-xs text-[#4A7561]">
+              {formatDuration(metadata.duration)} · {metadata.width}×{metadata.height} · {formatFileSize(metadata.size)}
+            </p>
           </div>
           <button
             onClick={onRemove}
-            className="p-1.5 rounded hover:bg-[#E8E8E5] transition-colors text-[#4A7561] hover:text-[#0B241C]"
+            className="p-1.5 rounded hover:bg-[#E8E8E5] transition-colors text-[#4A7561] hover:text-[#0B241C] flex-shrink-0"
+            title="Remove video"
           >
             <CloseIcon />
           </button>
@@ -300,13 +279,13 @@
                 onClick={() => onChange({ ...config, showTimestamps: !config.showTimestamps })}
                 className={`
                   relative w-11 h-6 rounded-full transition-colors duration-200
-                  ${config.showTimestamps ? 'bg-[#11362A]' : 'bg-[#E8E8E5]'}
+                  ${config.showTimestamps ? 'bg-[#889A68]' : 'bg-[#E8E8E5]'}
                 `}
               >
                 <span
                   className={`
-                    absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200
-                    ${config.showTimestamps ? 'translate-x-6' : 'translate-x-1'}
+                    absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-200
+                    ${config.showTimestamps ? 'left-6' : 'left-1'}
                   `}
                 />
               </button>
@@ -430,126 +409,17 @@
     };
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // GRID PREVIEW
+    // RESULT CARD (Preview + Download)
     // ─────────────────────────────────────────────────────────────────────────────
 
-    const GridPreview = ({ dataUrl, zoom, onZoomChange }) => {
-      const containerRef = useRef(null);
-      const [pan, setPan] = useState({ x: 0, y: 0 });
-      const [isPanning, setIsPanning] = useState(false);
-      const lastPan = useRef({ x: 0, y: 0 });
-
-      const handleWheel = useCallback((e) => {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        onZoomChange(Math.max(0.25, Math.min(3, zoom + delta)));
-      }, [zoom, onZoomChange]);
-
-      const handleMouseDown = (e) => {
-        setIsPanning(true);
-        lastPan.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
-      };
-
-      const handleMouseUp = () => setIsPanning(false);
-      const handleMouseLeave = () => setIsPanning(false);
-
-      const handleMouseMove = (e) => {
-        if (isPanning) {
-          setPan({
-            x: e.clientX - lastPan.current.x,
-            y: e.clientY - lastPan.current.y
-          });
-        }
-      };
-
-      const resetView = () => {
-        setPan({ x: 0, y: 0 });
-        onZoomChange(1);
-      };
-
-      useEffect(() => {
-        const container = containerRef.current;
-        if (container) {
-          container.addEventListener('wheel', handleWheel, { passive: false });
-          return () => container.removeEventListener('wheel', handleWheel);
-        }
-      }, [handleWheel]);
-
-      return (
-        <div className="bg-white rounded-xl border border-[#E8E8E5] overflow-hidden">
-          {/* Toolbar */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[#E8E8E5] bg-[#FAFAF9]">
-            <span className="text-sm font-medium text-[#0B241C]">Preview</span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onZoomChange(Math.max(0.25, zoom - 0.25))}
-                className="p-1.5 rounded hover:bg-[#E8E8E5] transition-colors text-[#4A7561]"
-                title="Zoom out"
-              >
-                <ZoomOutIcon />
-              </button>
-              <span className="text-xs text-[#737370] w-12 text-center">{Math.round(zoom * 100)}%</span>
-              <button
-                onClick={() => onZoomChange(Math.min(3, zoom + 0.25))}
-                className="p-1.5 rounded hover:bg-[#E8E8E5] transition-colors text-[#4A7561]"
-                title="Zoom in"
-              >
-                <ZoomInIcon />
-              </button>
-              <div className="w-px h-4 bg-[#E8E8E5] mx-1" />
-              <button
-                onClick={resetView}
-                className="p-1.5 rounded hover:bg-[#E8E8E5] transition-colors text-[#4A7561]"
-                title="Reset view"
-              >
-                <ResetIcon />
-              </button>
-            </div>
-          </div>
-
-          {/* Canvas area */}
-          <div
-            ref={containerRef}
-            className="relative bg-[#1A1A18] overflow-hidden cursor-grab active:cursor-grabbing"
-            style={{ height: '400px' }}
-            onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseLeave}
-            onMouseMove={handleMouseMove}
-          >
-            <div
-              className="absolute inset-0 flex items-center justify-center"
-              style={{
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                transformOrigin: 'center center',
-                transition: isPanning ? 'none' : 'transform 0.1s ease-out'
-              }}
-            >
-              <img
-                src={dataUrl}
-                alt="Contact sheet preview"
-                className="max-w-none"
-                draggable={false}
-              />
-            </div>
-          </div>
-        </div>
-      );
-    };
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // EXPORT BUTTONS
-    // ─────────────────────────────────────────────────────────────────────────────
-
-    const ExportButtons = ({ canvas, filename, disabled }) => {
+    const ResultCard = ({ dataUrl, canvas, filename }) => {
       const download = (format) => {
         if (!canvas) return;
 
-        let dataUrl;
+        let url;
         if (format === 'png') {
-          dataUrl = canvas.toDataURL('image/png');
+          url = canvas.toDataURL('image/png');
         } else {
-          // Create white background for JPG
           const jpgCanvas = document.createElement('canvas');
           jpgCanvas.width = canvas.width;
           jpgCanvas.height = canvas.height;
@@ -557,11 +427,11 @@
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(0, 0, jpgCanvas.width, jpgCanvas.height);
           ctx.drawImage(canvas, 0, 0);
-          dataUrl = jpgCanvas.toDataURL('image/jpeg', 0.92);
+          url = jpgCanvas.toDataURL('image/jpeg', 0.92);
         }
 
         const link = document.createElement('a');
-        link.href = dataUrl;
+        link.href = url;
         link.download = `${filename}_contact_sheet.${format}`;
         document.body.appendChild(link);
         link.click();
@@ -569,37 +439,39 @@
       };
 
       return (
-        <div className="flex gap-3">
-          <button
-            onClick={() => download('png')}
-            disabled={disabled}
-            className={`
-              flex-1 px-4 py-2.5 rounded-lg text-sm font-medium
-              flex items-center justify-center gap-2 transition-colors
-              ${disabled
-                ? 'bg-[#E8E8E5] text-[#737370] cursor-not-allowed'
-                : 'bg-[#11362A] text-white hover:bg-[#0B241C]'
-              }
-            `}
-          >
-            <DownloadIcon />
-            Download PNG
-          </button>
-          <button
-            onClick={() => download('jpg')}
-            disabled={disabled}
-            className={`
-              flex-1 px-4 py-2.5 rounded-lg text-sm font-medium
-              flex items-center justify-center gap-2 transition-colors
-              ${disabled
-                ? 'bg-[#F5F5F3] text-[#737370] cursor-not-allowed border border-[#E8E8E5]'
-                : 'border-2 border-[#11362A] text-[#11362A] hover:bg-[#F4F6F0]'
-              }
-            `}
-          >
-            <DownloadIcon />
-            Download JPG
-          </button>
+        <div className="bg-white rounded-xl border border-[#E8E8E5] overflow-hidden">
+          {/* Image preview - fits entire image */}
+          <div className="bg-[#F5F5F3] p-4">
+            <img
+              src={dataUrl}
+              alt="Contact sheet"
+              className="w-full h-auto"
+              draggable={false}
+            />
+          </div>
+
+          {/* Download toolbar */}
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[#E8E8E5] bg-[#FAFAF9]">
+            <span className="text-sm text-[#737370]">
+              {canvas ? `${canvas.width} × ${canvas.height}px` : ''}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => download('png')}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-[#11362A] text-white hover:bg-[#0B241C] transition-colors flex items-center gap-2"
+              >
+                <DownloadIcon />
+                PNG
+              </button>
+              <button
+                onClick={() => download('jpg')}
+                className="px-4 py-2 rounded-lg text-sm font-medium border border-[#E8E8E5] text-[#0B241C] hover:bg-[#F4F6F0] transition-colors flex items-center gap-2"
+              >
+                <DownloadIcon />
+                JPG
+              </button>
+            </div>
+          </div>
         </div>
       );
     };
@@ -652,10 +524,9 @@
       const [error, setError] = useState(null);
       const [gridCanvas, setGridCanvas] = useState(null);
       const [gridDataUrl, setGridDataUrl] = useState(null);
-      const [previewZoom, setPreviewZoom] = useState(1);
       const [config, setConfig] = useState({
-        rows: 4,
-        cols: 4,
+        rows: 3,
+        cols: 3,
         showTimestamps: true,
         resolution: 'medium'
       });
@@ -777,12 +648,15 @@
         const frameWidth = Math.round(firstImg.width * scale);
         const frameHeight = Math.round(firstImg.height * scale);
 
-        // Padding between frames
-        const padding = 4;
+        // Padding and spacing
+        const colGap = 20;                                   // Between columns
+        const timestampHeight = showTimestamps ? Math.round(40 * scale) : 0;  // Space for timestamp below frame
+        const rowGap = 4 + timestampHeight;                  // Between rows (includes timestamp area)
+        const margin = 40;                                   // Outer margin
 
         // Canvas dimensions
-        const canvasWidth = cols * frameWidth + (cols - 1) * padding;
-        const canvasHeight = rows * frameHeight + (rows - 1) * padding;
+        const canvasWidth = cols * frameWidth + (cols - 1) * colGap + margin * 2;
+        const canvasHeight = rows * frameHeight + (rows - 1) * rowGap + margin * 2;
 
         // Create canvas
         const canvas = document.createElement('canvas');
@@ -790,36 +664,30 @@
         canvas.height = canvasHeight;
         const ctx = canvas.getContext('2d');
 
-        // Fill background
-        ctx.fillStyle = '#1A1A18';
+        // Fill background (white)
+        ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
         // Draw frames
         for (let i = 0; i < frames.length && i < rows * cols; i++) {
           const row = Math.floor(i / cols);
           const col = i % cols;
-          const x = col * (frameWidth + padding);
-          const y = row * (frameHeight + padding);
+          const x = margin + col * (frameWidth + colGap);
+          const y = margin + row * (frameHeight + rowGap);
 
           const img = await createImageBitmap(frames[i].blob);
           ctx.drawImage(img, x, y, frameWidth, frameHeight);
 
-          // Draw timestamp overlay
+          // Draw timestamp below frame
           if (showTimestamps) {
             const timeStr = formatTimestamp(frames[i].timestamp);
-            const bgHeight = Math.round(24 * scale);
-            const fontSize = Math.round(12 * scale);
+            const fontSize = Math.round(18 * scale);
 
-            // Semi-transparent background
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            ctx.fillRect(x, y + frameHeight - bgHeight, frameWidth, bgHeight);
-
-            // Timestamp text
-            ctx.fillStyle = '#FFFFFF';
+            ctx.fillStyle = '#4A4A4A';
             ctx.font = `${fontSize}px system-ui, -apple-system, sans-serif`;
             ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(timeStr, x + frameWidth / 2, y + frameHeight - bgHeight / 2);
+            ctx.textBaseline = 'top';
+            ctx.fillText(timeStr, x + frameWidth / 2, y + frameHeight + 12);
           }
 
           setProgress(70 + Math.round(((i + 1) / frames.length) * 25));
@@ -887,10 +755,10 @@
       const showProgress = isGenerating || stage === 'complete';
 
       return (
-        <div className="min-h-screen">
+        <div className="min-h-screen flex flex-col">
           {/* Header */}
-          <header className="border-b border-[#E8E8E5] bg-white">
-            <div className="max-w-4xl mx-auto px-6 py-4">
+          <header className="border-b border-[#E8E8E5] bg-white flex-shrink-0">
+            <div className="max-w-[1440px] mx-auto px-6 py-4">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[#11362A] flex items-center justify-center text-white">
                   <GridIcon />
@@ -903,22 +771,11 @@
             </div>
           </header>
 
-          {/* Main Content */}
-          <main className="max-w-4xl mx-auto px-6 py-8">
-            {/* Error Banner */}
-            {error && (
-              <div className="mb-6">
-                <ErrorBanner
-                  error={error}
-                  onDismiss={() => setError(null)}
-                  onRetry={canGenerate ? handleGenerate : null}
-                />
-              </div>
-            )}
-
-            <div className="grid md:grid-cols-3 gap-6">
-              {/* Left Column: Upload + Controls */}
-              <div className="md:col-span-1 space-y-4">
+          {/* Main Content - Two Column */}
+          <main className="flex-1 flex">
+            <div className="max-w-[1440px] w-full mx-auto flex flex-col lg:flex-row">
+              {/* Left Sidebar: Controls */}
+              <div className="lg:w-[320px] xl:w-[360px] flex-shrink-0 p-6 border-b lg:border-b-0 lg:border-r border-[#E8E8E5] bg-white space-y-4">
                 {!videoMetadata ? (
                   <UploadArea onFileSelect={handleFileSelect} disabled={isGenerating} />
                 ) : (
@@ -933,32 +790,43 @@
                     />
                   </>
                 )}
+
+                {/* Footer in sidebar on desktop */}
+                <div className="hidden lg:block pt-4 mt-auto">
+                  <p className="text-xs text-[#737370]">
+                    All processing happens locally in your browser. Your videos never leave your device.
+                  </p>
+                </div>
               </div>
 
-              {/* Right Column: Preview + Export */}
-              <div className="md:col-span-2 space-y-4">
+              {/* Right: Preview Area (80%) */}
+              <div className="flex-1 p-6 bg-[#F5F5F3] space-y-4">
+                {/* Error Banner */}
+                {error && (
+                  <ErrorBanner
+                    error={error}
+                    onDismiss={() => setError(null)}
+                    onRetry={canGenerate ? handleGenerate : null}
+                  />
+                )}
+
+                {/* Progress */}
                 {showProgress && (
                   <ProgressIndicator stage={stage} progress={progress} message={message} />
                 )}
 
+                {/* Result */}
                 {gridDataUrl ? (
-                  <>
-                    <GridPreview
-                      dataUrl={gridDataUrl}
-                      zoom={previewZoom}
-                      onZoomChange={setPreviewZoom}
-                    />
-                    <ExportButtons
-                      canvas={gridCanvas}
-                      filename={videoMetadata?.name.replace(/\.[^/.]+$/, '') || 'video'}
-                      disabled={!gridCanvas}
-                    />
-                  </>
+                  <ResultCard
+                    dataUrl={gridDataUrl}
+                    canvas={gridCanvas}
+                    filename={videoMetadata?.name.replace(/\.[^/.]+$/, '') || 'video'}
+                  />
                 ) : (
                   !showProgress && (
-                    <div className="bg-white rounded-xl border border-[#E8E8E5] flex items-center justify-center" style={{ height: '400px' }}>
+                    <div className="h-full min-h-[400px] flex items-center justify-center rounded-xl border-2 border-dashed border-[#E8E8E5] bg-white/50">
                       <div className="text-center">
-                        <div className="text-[#E8E8E5] mb-3">
+                        <div className="text-[#E8E8E5] mb-3 flex justify-center">
                           <GridIcon />
                         </div>
                         <p className="text-sm text-[#737370]">
@@ -972,9 +840,9 @@
             </div>
           </main>
 
-          {/* Footer */}
-          <footer className="border-t border-[#E8E8E5] bg-white mt-auto">
-            <div className="max-w-4xl mx-auto px-6 py-4">
+          {/* Footer on mobile */}
+          <footer className="lg:hidden border-t border-[#E8E8E5] bg-white">
+            <div className="px-6 py-4">
               <p className="text-xs text-[#737370] text-center">
                 All processing happens locally in your browser. Your videos never leave your device.
               </p>
