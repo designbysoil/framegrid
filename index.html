@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FrameGrid — Video Contact Sheet Generator</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    html { scroll-behavior: smooth; }
+    /* Hide number input spinners */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] { -moz-appearance: textfield; }
+  </style>
+</head>
+<body class="bg-[#FAFAF9]">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect, useCallback } = React;
+
+    // =============================================================================
+    // FRAMEGRID — VIDEO CONTACT SHEET GENERATOR
+    // =============================================================================
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // ICONS (IBM Carbon Design)
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    const UploadIcon = () => (
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor">
+        <path d="M16,7l-6.5,6.5,1.4,1.4,4.1-4.1V22h2V10.8l4.1,4.1,1.4-1.4Z"/>
+        <path d="M24,22v4H8V22H6v4a2,2,0,0,0,2,2H24a2,2,0,0,0,2-2V22Z"/>
+      </svg>
+    );
+
+    const VideoIcon = () => (
+      <svg width="20" height="20" viewBox="0 0 32 32" fill="currentColor">
+        <path d="M21,26H4a2,2,0,0,1-2-2V8A2,2,0,0,1,4,6H21a2,2,0,0,1,2,2v4.06l5.42-3.87A1,1,0,0,1,30,11V21a1,1,0,0,1-1.58.81L23,17.94V24A2,2,0,0,1,21,26ZM4,8V24H21V16a1,1,0,0,1,1.58-.81L28,18.92V13.08l-5.42,3.87A1,1,0,0,1,21,16V8Z"/>
+      </svg>
+    );
+
+    const GridIcon = () => (
+      <svg width="20" height="20" viewBox="0 0 32 32" fill="currentColor">
+        <path d="M12,4H6A2,2,0,0,0,4,6v6a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V6A2,2,0,0,0,12,4Zm0,8H6V6h6Z"/>
+        <path d="M26,4H20a2,2,0,0,0-2,2v6a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V6A2,2,0,0,0,26,4Zm0,8H20V6h6Z"/>
+        <path d="M12,18H6a2,2,0,0,0-2,2v6a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V20A2,2,0,0,0,12,18Zm0,8H6V20h6Z"/>
+        <path d="M26,18H20a2,2,0,0,0-2,2v6a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V20A2,2,0,0,0,26,18Zm0,8H20V20h6Z"/>
+      </svg>
+    );
+
+    const DownloadIcon = () => (
+      <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
+        <path d="M26,24v4H6V24H4v4a2,2,0,0,0,2,2H26a2,2,0,0,0,2-2V24Z"/>
+        <path d="M16,22l6.5-6.5-1.4-1.4-4.1,4.1V2h-2V18.2l-4.1-4.1L9.5,15.5Z"/>
+      </svg>
+    );
+
+    const ZoomInIcon = () => (
+      <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
+        <path d="M19,13H15V9H13v4H9v2h4v4h2V15h4V13Z"/>
+        <path d="M22.45,21A10.87,10.87,0,0,0,25,14,11,11,0,1,0,14,25a10.87,10.87,0,0,0,7-2.55L28.59,30,30,28.59ZM14,23a9,9,0,1,1,9-9A9,9,0,0,1,14,23Z"/>
+      </svg>
+    );
+
+    const ZoomOutIcon = () => (
+      <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
+        <rect x="9" y="13" width="10" height="2"/>
+        <path d="M22.45,21A10.87,10.87,0,0,0,25,14,11,11,0,1,0,14,25a10.87,10.87,0,0,0,7-2.55L28.59,30,30,28.59ZM14,23a9,9,0,1,1,9-9A9,9,0,0,1,14,23Z"/>
+      </svg>
+    );
+
+    const ResetIcon = () => (
+      <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
+        <path d="M18,28A12,12,0,1,0,6,16v6.2l-3.6-3.6L1,20l6,6,6-6-1.4-1.4L8,22.2V16H8A10,10,0,1,1,18,26Z"/>
+      </svg>
+    );
+
+    const CloseIcon = () => (
+      <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
+        <path d="M24,9.4,22.6,8,16,14.6,9.4,8,8,9.4,14.6,16,8,22.6,9.4,24,16,17.4,22.6,24,24,22.6,17.4,16Z"/>
+      </svg>
+    );
+
+    const CheckIcon = () => (
+      <svg width="16" height="16" viewBox="0 0 32 32" fill="currentColor">
+        <path d="M13,24.5l-8-8,1.4-1.4L13,21.7,25.6,9.1,27,10.5Z"/>
+      </svg>
+    );
+
+    const WarningIcon = () => (
+      <svg width="20" height="20" viewBox="0 0 32 32" fill="currentColor">
+        <path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2Zm0,26A12,12,0,1,1,28,16,12,12,0,0,1,16,28Z"/>
+        <path d="M15 8H17V19H15zM16 22a1.5 1.5 0 101.5 1.5A1.5 1.5 0 0016 22z"/>
+      </svg>
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // UTILITY FUNCTIONS
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    const formatDuration = (seconds) => {
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      if (hrs > 0) {
+        return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      }
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const formatTimestamp = (seconds) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      const ms = Math.floor((seconds % 1) * 100);
+      return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+    };
+
+    const formatFileSize = (bytes) => {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+      return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    };
+
+    const isValidVideoFile = (file) => {
+      const validTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/x-matroska'];
+      return validTypes.includes(file.type) ||
+             file.name.match(/\.(mp4|mov|avi|webm|mkv)$/i);
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // UPLOAD AREA COMPONENT
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    const UploadArea = ({ onFileSelect, disabled }) => {
+      const [isDragging, setIsDragging] = useState(false);
+      const fileInputRef = useRef(null);
+
+      const handleDragOver = (e) => {
+        e.preventDefault();
+        if (!disabled) setIsDragging(true);
+      };
+
+      const handleDragLeave = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+      };
+
+      const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (disabled) return;
+
+        const file = e.dataTransfer.files[0];
+        if (file && isValidVideoFile(file)) {
+          onFileSelect(file);
+        }
+      };
+
+      const handleClick = () => {
+        if (!disabled) fileInputRef.current?.click();
+      };
+
+      const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file && isValidVideoFile(file)) {
+          onFileSelect(file);
+        }
+      };
+
+      return (
+        <div
+          onClick={handleClick}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`
+            relative rounded-xl border-2 border-dashed p-12 text-center cursor-pointer
+            transition-all duration-200
+            ${isDragging
+              ? 'border-[#11362A] bg-[#F4F6F0]'
+              : 'border-[#E8E8E5] bg-white hover:border-[#889A68] hover:bg-[#FAFAF9]'
+            }
+            ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+          `}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="video/mp4,video/quicktime,video/x-msvideo,video/webm,.mp4,.mov,.avi,.webm,.mkv"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <div className="text-[#4A7561] mb-4">
+            <UploadIcon />
+          </div>
+          <p className="text-base font-medium text-[#0B241C] mb-2">
+            Drop your video here
+          </p>
+          <p className="text-sm text-[#4A7561]">
+            or click to browse. Supports MP4, MOV, AVI, WebM
+          </p>
+        </div>
+      );
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // VIDEO INFO CARD
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    const VideoInfoCard = ({ metadata, onRemove }) => (
+      <div className="bg-[#F4F6F0] rounded-xl p-4 border border-[#E8E8E5]">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-[#11362A] flex items-center justify-center text-white">
+              <VideoIcon />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[#0B241C] truncate max-w-[200px]">
+                {metadata.name}
+              </p>
+              <p className="text-xs text-[#4A7561]">
+                {formatDuration(metadata.duration)} · {metadata.width}×{metadata.height} · {formatFileSize(metadata.size)}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onRemove}
+            className="p-1.5 rounded hover:bg-[#E8E8E5] transition-colors text-[#4A7561] hover:text-[#0B241C]"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+      </div>
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // CONTROLS PANEL
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    const ControlsPanel = ({ config, onChange, onGenerate, disabled, generating }) => {
+      const totalFrames = config.rows * config.cols;
+
+      return (
+        <div className="bg-white rounded-xl p-6 border border-[#E8E8E5]">
+          <h3 className="text-base font-semibold text-[#0B241C] mb-4">Settings</h3>
+
+          {/* Grid Dimensions */}
+          <div className="mb-5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-[#737370] mb-2 block">
+              Grid Size
+            </label>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={config.rows}
+                  onChange={(e) => onChange({ ...config, rows: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) })}
+                  className="w-full px-3 py-2 text-sm border border-[#E8E8E5] rounded-lg focus:outline-none focus:border-[#11362A] text-center"
+                />
+                <p className="text-xs text-[#737370] text-center mt-1">Rows</p>
+              </div>
+              <span className="text-[#737370]">×</span>
+              <div className="flex-1">
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={config.cols}
+                  onChange={(e) => onChange({ ...config, cols: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) })}
+                  className="w-full px-3 py-2 text-sm border border-[#E8E8E5] rounded-lg focus:outline-none focus:border-[#11362A] text-center"
+                />
+                <p className="text-xs text-[#737370] text-center mt-1">Columns</p>
+              </div>
+            </div>
+            <p className="text-xs text-[#4A7561] mt-2">{totalFrames} frames total</p>
+          </div>
+
+          {/* Timestamp Toggle */}
+          <div className="mb-5">
+            <label className="flex items-center justify-between cursor-pointer">
+              <span className="text-sm text-[#0B241C]">Show Timestamps</span>
+              <button
+                onClick={() => onChange({ ...config, showTimestamps: !config.showTimestamps })}
+                className={`
+                  relative w-11 h-6 rounded-full transition-colors duration-200
+                  ${config.showTimestamps ? 'bg-[#11362A]' : 'bg-[#E8E8E5]'}
+                `}
+              >
+                <span
+                  className={`
+                    absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200
+                    ${config.showTimestamps ? 'translate-x-6' : 'translate-x-1'}
+                  `}
+                />
+              </button>
+            </label>
+          </div>
+
+          {/* Resolution Selector */}
+          <div className="mb-6">
+            <label className="text-xs font-semibold uppercase tracking-wider text-[#737370] mb-2 block">
+              Resolution
+            </label>
+            <div className="flex gap-2">
+              {['low', 'medium', 'high'].map((res) => (
+                <button
+                  key={res}
+                  onClick={() => onChange({ ...config, resolution: res })}
+                  className={`
+                    flex-1 px-3 py-2 text-sm rounded-lg transition-colors capitalize
+                    ${config.resolution === res
+                      ? 'bg-[#11362A] text-white'
+                      : 'bg-[#F5F5F3] text-[#4A7561] hover:bg-[#E8E8E5]'
+                    }
+                  `}
+                >
+                  {res}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Generate Button */}
+          <button
+            onClick={onGenerate}
+            disabled={disabled || generating}
+            className={`
+              w-full px-4 py-3 rounded-lg text-white text-sm font-medium
+              transition-colors flex items-center justify-center gap-2
+              ${disabled || generating
+                ? 'bg-[#E8E8E5] text-[#737370] cursor-not-allowed'
+                : 'bg-[#11362A] hover:bg-[#0B241C]'
+              }
+            `}
+          >
+            {generating ? (
+              <>
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Processing...
+              </>
+            ) : (
+              <>
+                <GridIcon />
+                Generate Contact Sheet
+              </>
+            )}
+          </button>
+        </div>
+      );
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // PROGRESS INDICATOR
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    const ProgressIndicator = ({ stage, progress, message }) => {
+      const stages = [
+        { id: 'loading-wasm', label: 'Loading', num: 1 },
+        { id: 'extracting', label: 'Extracting', num: 2 },
+        { id: 'stitching', label: 'Stitching', num: 3 },
+        { id: 'complete', label: 'Complete', num: 4 },
+      ];
+
+      const getStageIndex = (s) => stages.findIndex(st => st.id === s);
+      const currentIndex = getStageIndex(stage);
+
+      return (
+        <div className="bg-[#F4F6F0] rounded-xl p-6 border border-[#E8E8E5]">
+          {/* Stage indicators */}
+          <div className="flex items-center justify-between mb-4">
+            {stages.map((s, i) => (
+              <React.Fragment key={s.id}>
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`
+                      w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+                      transition-colors duration-300
+                      ${currentIndex > i
+                        ? 'bg-[#11362A] text-white'
+                        : currentIndex === i
+                          ? 'bg-[#889A68] text-white'
+                          : 'bg-[#E8E8E5] text-[#737370]'
+                      }
+                    `}
+                  >
+                    {currentIndex > i ? <CheckIcon /> : s.num}
+                  </div>
+                  <span className={`text-xs mt-1 ${currentIndex >= i ? 'text-[#0B241C]' : 'text-[#737370]'}`}>
+                    {s.label}
+                  </span>
+                </div>
+                {i < stages.length - 1 && (
+                  <div className={`flex-1 h-0.5 mx-2 ${currentIndex > i ? 'bg-[#11362A]' : 'bg-[#E8E8E5]'}`} />
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+
+          {/* Progress bar */}
+          <div className="h-2 bg-[#E8E8E5] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#889A68] rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+
+          {/* Status message */}
+          <p className="text-sm text-[#4A7561] mt-3">{message}</p>
+        </div>
+      );
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // GRID PREVIEW
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    const GridPreview = ({ dataUrl, zoom, onZoomChange }) => {
+      const containerRef = useRef(null);
+      const [pan, setPan] = useState({ x: 0, y: 0 });
+      const [isPanning, setIsPanning] = useState(false);
+      const lastPan = useRef({ x: 0, y: 0 });
+
+      const handleWheel = useCallback((e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        onZoomChange(Math.max(0.25, Math.min(3, zoom + delta)));
+      }, [zoom, onZoomChange]);
+
+      const handleMouseDown = (e) => {
+        setIsPanning(true);
+        lastPan.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+      };
+
+      const handleMouseUp = () => setIsPanning(false);
+      const handleMouseLeave = () => setIsPanning(false);
+
+      const handleMouseMove = (e) => {
+        if (isPanning) {
+          setPan({
+            x: e.clientX - lastPan.current.x,
+            y: e.clientY - lastPan.current.y
+          });
+        }
+      };
+
+      const resetView = () => {
+        setPan({ x: 0, y: 0 });
+        onZoomChange(1);
+      };
+
+      useEffect(() => {
+        const container = containerRef.current;
+        if (container) {
+          container.addEventListener('wheel', handleWheel, { passive: false });
+          return () => container.removeEventListener('wheel', handleWheel);
+        }
+      }, [handleWheel]);
+
+      return (
+        <div className="bg-white rounded-xl border border-[#E8E8E5] overflow-hidden">
+          {/* Toolbar */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[#E8E8E5] bg-[#FAFAF9]">
+            <span className="text-sm font-medium text-[#0B241C]">Preview</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onZoomChange(Math.max(0.25, zoom - 0.25))}
+                className="p-1.5 rounded hover:bg-[#E8E8E5] transition-colors text-[#4A7561]"
+                title="Zoom out"
+              >
+                <ZoomOutIcon />
+              </button>
+              <span className="text-xs text-[#737370] w-12 text-center">{Math.round(zoom * 100)}%</span>
+              <button
+                onClick={() => onZoomChange(Math.min(3, zoom + 0.25))}
+                className="p-1.5 rounded hover:bg-[#E8E8E5] transition-colors text-[#4A7561]"
+                title="Zoom in"
+              >
+                <ZoomInIcon />
+              </button>
+              <div className="w-px h-4 bg-[#E8E8E5] mx-1" />
+              <button
+                onClick={resetView}
+                className="p-1.5 rounded hover:bg-[#E8E8E5] transition-colors text-[#4A7561]"
+                title="Reset view"
+              >
+                <ResetIcon />
+              </button>
+            </div>
+          </div>
+
+          {/* Canvas area */}
+          <div
+            ref={containerRef}
+            className="relative bg-[#1A1A18] overflow-hidden cursor-grab active:cursor-grabbing"
+            style={{ height: '400px' }}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
+            onMouseMove={handleMouseMove}
+          >
+            <div
+              className="absolute inset-0 flex items-center justify-center"
+              style={{
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transformOrigin: 'center center',
+                transition: isPanning ? 'none' : 'transform 0.1s ease-out'
+              }}
+            >
+              <img
+                src={dataUrl}
+                alt="Contact sheet preview"
+                className="max-w-none"
+                draggable={false}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // EXPORT BUTTONS
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    const ExportButtons = ({ canvas, filename, disabled }) => {
+      const download = (format) => {
+        if (!canvas) return;
+
+        let dataUrl;
+        if (format === 'png') {
+          dataUrl = canvas.toDataURL('image/png');
+        } else {
+          // Create white background for JPG
+          const jpgCanvas = document.createElement('canvas');
+          jpgCanvas.width = canvas.width;
+          jpgCanvas.height = canvas.height;
+          const ctx = jpgCanvas.getContext('2d');
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, jpgCanvas.width, jpgCanvas.height);
+          ctx.drawImage(canvas, 0, 0);
+          dataUrl = jpgCanvas.toDataURL('image/jpeg', 0.92);
+        }
+
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = `${filename}_contact_sheet.${format}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+      return (
+        <div className="flex gap-3">
+          <button
+            onClick={() => download('png')}
+            disabled={disabled}
+            className={`
+              flex-1 px-4 py-2.5 rounded-lg text-sm font-medium
+              flex items-center justify-center gap-2 transition-colors
+              ${disabled
+                ? 'bg-[#E8E8E5] text-[#737370] cursor-not-allowed'
+                : 'bg-[#11362A] text-white hover:bg-[#0B241C]'
+              }
+            `}
+          >
+            <DownloadIcon />
+            Download PNG
+          </button>
+          <button
+            onClick={() => download('jpg')}
+            disabled={disabled}
+            className={`
+              flex-1 px-4 py-2.5 rounded-lg text-sm font-medium
+              flex items-center justify-center gap-2 transition-colors
+              ${disabled
+                ? 'bg-[#F5F5F3] text-[#737370] cursor-not-allowed border border-[#E8E8E5]'
+                : 'border-2 border-[#11362A] text-[#11362A] hover:bg-[#F4F6F0]'
+              }
+            `}
+          >
+            <DownloadIcon />
+            Download JPG
+          </button>
+        </div>
+      );
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // ERROR BANNER
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    const ErrorBanner = ({ error, onDismiss, onRetry }) => {
+      if (!error) return null;
+
+      return (
+        <div className="bg-[#8B4049]/10 border border-[#8B4049] rounded-lg p-4 flex items-start gap-3">
+          <div className="text-[#8B4049] flex-shrink-0">
+            <WarningIcon />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-[#8B4049]">{error.message}</p>
+            {error.recoverable && onRetry && (
+              <button
+                onClick={onRetry}
+                className="text-sm text-[#8B4049] underline mt-1 hover:no-underline"
+              >
+                Try again
+              </button>
+            )}
+          </div>
+          <button
+            onClick={onDismiss}
+            className="text-[#8B4049] hover:opacity-70 flex-shrink-0"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+      );
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // MAIN APP COMPONENT
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    const FrameGridApp = () => {
+      // State
+      const [videoFile, setVideoFile] = useState(null);
+      const [videoUrl, setVideoUrl] = useState(null);
+      const [videoMetadata, setVideoMetadata] = useState(null);
+      const [ffmpeg, setFFmpeg] = useState(null);
+      const [ffmpegLoaded, setFFmpegLoaded] = useState(false);
+      const [stage, setStage] = useState('idle');
+      const [progress, setProgress] = useState(0);
+      const [message, setMessage] = useState('');
+      const [error, setError] = useState(null);
+      const [gridCanvas, setGridCanvas] = useState(null);
+      const [gridDataUrl, setGridDataUrl] = useState(null);
+      const [previewZoom, setPreviewZoom] = useState(1);
+      const [config, setConfig] = useState({
+        rows: 4,
+        cols: 4,
+        showTimestamps: true,
+        resolution: 'medium'
+      });
+
+      const videoRef = useRef(null);
+
+      // Handle file selection
+      const handleFileSelect = async (file) => {
+        setError(null);
+        setVideoFile(file);
+
+        // Create object URL
+        const url = URL.createObjectURL(file);
+        setVideoUrl(url);
+
+        // Extract metadata using video element
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+
+        await new Promise((resolve, reject) => {
+          video.onloadedmetadata = () => {
+            setVideoMetadata({
+              name: file.name,
+              duration: video.duration,
+              width: video.videoWidth,
+              height: video.videoHeight,
+              size: file.size
+            });
+            resolve();
+          };
+          video.onerror = () => reject(new Error('Failed to load video metadata'));
+          video.src = url;
+        });
+      };
+
+      // Remove video
+      const handleRemoveVideo = () => {
+        if (videoUrl) URL.revokeObjectURL(videoUrl);
+        setVideoFile(null);
+        setVideoUrl(null);
+        setVideoMetadata(null);
+        setGridCanvas(null);
+        setGridDataUrl(null);
+        setStage('idle');
+        setProgress(0);
+        setError(null);
+      };
+
+      // Load FFmpeg.wasm
+      const loadFFmpeg = async () => {
+        setStage('loading-wasm');
+        setMessage('Loading video processing library...');
+        setProgress(0);
+
+        try {
+          const { FFmpeg } = await import('https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js');
+          const { fetchFile } = await import('https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js');
+
+          const ffmpegInstance = new FFmpeg();
+
+          ffmpegInstance.on('progress', ({ progress: p }) => {
+            // Progress during extraction phase (20-80%)
+            if (stage === 'extracting') {
+              setProgress(20 + Math.round(p * 60));
+            }
+          });
+
+          ffmpegInstance.on('log', ({ message: msg }) => {
+            console.log('[FFmpeg]', msg);
+          });
+
+          setProgress(10);
+          setMessage('Downloading FFmpeg core...');
+
+          await ffmpegInstance.load({
+            coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js',
+            wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm',
+          });
+
+          setFFmpeg(ffmpegInstance);
+          setFFmpegLoaded(true);
+          setProgress(20);
+
+          // Store fetchFile for later use
+          window.__ffmpegFetchFile = fetchFile;
+
+          return ffmpegInstance;
+        } catch (err) {
+          console.error('FFmpeg load error:', err);
+          throw new Error('Failed to load video processing library. Make sure your server has COOP/COEP headers enabled.');
+        }
+      };
+
+      // Extract frames
+      const extractFrames = async (ffmpegInstance) => {
+        setStage('extracting');
+        setMessage('Extracting frames from video...');
+
+        const { duration } = videoMetadata;
+        const numFrames = config.rows * config.cols;
+        const interval = duration / (numFrames + 1);
+        const timestamps = Array.from({ length: numFrames }, (_, i) => (i + 1) * interval);
+
+        const fetchFile = window.__ffmpegFetchFile;
+
+        // Write video to FFmpeg filesystem
+        const videoData = await fetchFile(videoFile);
+        await ffmpegInstance.writeFile('input.mp4', videoData);
+
+        const frames = [];
+
+        for (let i = 0; i < numFrames; i++) {
+          const timestamp = timestamps[i];
+          const outputName = `frame_${i.toString().padStart(3, '0')}.png`;
+
+          setMessage(`Extracting frame ${i + 1} of ${numFrames}...`);
+
+          await ffmpegInstance.exec([
+            '-ss', timestamp.toFixed(3),
+            '-i', 'input.mp4',
+            '-frames:v', '1',
+            '-q:v', '2',
+            outputName
+          ]);
+
+          const data = await ffmpegInstance.readFile(outputName);
+          const blob = new Blob([data.buffer], { type: 'image/png' });
+
+          frames.push({
+            blob,
+            timestamp,
+            index: i
+          });
+
+          // Clean up frame file
+          await ffmpegInstance.deleteFile(outputName);
+
+          setProgress(20 + Math.round(((i + 1) / numFrames) * 60));
+        }
+
+        // Clean up input file
+        await ffmpegInstance.deleteFile('input.mp4');
+
+        return frames;
+      };
+
+      // Stitch frames into grid
+      const stitchFrames = async (frames) => {
+        setStage('stitching');
+        setMessage('Creating contact sheet...');
+        setProgress(80);
+
+        const { rows, cols, showTimestamps, resolution } = config;
+
+        // Resolution scale
+        const scale = { low: 0.5, medium: 1.0, high: 1.5 }[resolution];
+
+        // Load first frame to get dimensions
+        const firstImg = await createImageBitmap(frames[0].blob);
+        const frameWidth = Math.round(firstImg.width * scale);
+        const frameHeight = Math.round(firstImg.height * scale);
+
+        // Padding between frames
+        const padding = 4;
+
+        // Canvas dimensions
+        const canvasWidth = cols * frameWidth + (cols - 1) * padding;
+        const canvasHeight = rows * frameHeight + (rows - 1) * padding;
+
+        // Create canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        const ctx = canvas.getContext('2d');
+
+        // Fill background
+        ctx.fillStyle = '#1A1A18';
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        // Draw frames
+        for (let i = 0; i < frames.length && i < rows * cols; i++) {
+          const row = Math.floor(i / cols);
+          const col = i % cols;
+          const x = col * (frameWidth + padding);
+          const y = row * (frameHeight + padding);
+
+          const img = await createImageBitmap(frames[i].blob);
+          ctx.drawImage(img, x, y, frameWidth, frameHeight);
+
+          // Draw timestamp overlay
+          if (showTimestamps) {
+            const timeStr = formatTimestamp(frames[i].timestamp);
+            const bgHeight = Math.round(24 * scale);
+            const fontSize = Math.round(12 * scale);
+
+            // Semi-transparent background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(x, y + frameHeight - bgHeight, frameWidth, bgHeight);
+
+            // Timestamp text
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = `${fontSize}px system-ui, -apple-system, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(timeStr, x + frameWidth / 2, y + frameHeight - bgHeight / 2);
+          }
+
+          setProgress(80 + Math.round(((i + 1) / frames.length) * 15));
+          setMessage(`Stitching frame ${i + 1} of ${frames.length}...`);
+        }
+
+        setProgress(95);
+        return canvas;
+      };
+
+      // Generate contact sheet
+      const handleGenerate = async () => {
+        setError(null);
+        setGridCanvas(null);
+        setGridDataUrl(null);
+
+        try {
+          // Load FFmpeg if not loaded
+          let ffmpegInstance = ffmpeg;
+          if (!ffmpegLoaded) {
+            ffmpegInstance = await loadFFmpeg();
+          } else {
+            setStage('extracting');
+            setProgress(20);
+          }
+
+          // Extract frames
+          const frames = await extractFrames(ffmpegInstance);
+
+          // Stitch into grid
+          const canvas = await stitchFrames(frames);
+
+          // Generate preview
+          const dataUrl = canvas.toDataURL('image/png');
+
+          setGridCanvas(canvas);
+          setGridDataUrl(dataUrl);
+          setStage('complete');
+          setProgress(100);
+          setMessage('Contact sheet generated successfully!');
+
+        } catch (err) {
+          console.error('Generation error:', err);
+          setError({
+            message: err.message || 'Failed to generate contact sheet',
+            recoverable: true
+          });
+          setStage('idle');
+          setProgress(0);
+        }
+      };
+
+      // Cleanup on unmount
+      useEffect(() => {
+        return () => {
+          if (videoUrl) URL.revokeObjectURL(videoUrl);
+        };
+      }, [videoUrl]);
+
+      const isGenerating = ['loading-wasm', 'extracting', 'stitching'].includes(stage);
+      const canGenerate = videoMetadata && !isGenerating;
+      const showProgress = isGenerating || stage === 'complete';
+
+      return (
+        <div className="min-h-screen">
+          {/* Header */}
+          <header className="border-b border-[#E8E8E5] bg-white">
+            <div className="max-w-4xl mx-auto px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#11362A] flex items-center justify-center text-white">
+                  <GridIcon />
+                </div>
+                <div>
+                  <h1 className="text-lg font-semibold text-[#0B241C]">FrameGrid</h1>
+                  <p className="text-xs text-[#4A7561]">Video Contact Sheet Generator</p>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content */}
+          <main className="max-w-4xl mx-auto px-6 py-8">
+            {/* Error Banner */}
+            {error && (
+              <div className="mb-6">
+                <ErrorBanner
+                  error={error}
+                  onDismiss={() => setError(null)}
+                  onRetry={canGenerate ? handleGenerate : null}
+                />
+              </div>
+            )}
+
+            <div className="grid md:grid-cols-3 gap-6">
+              {/* Left Column: Upload + Controls */}
+              <div className="md:col-span-1 space-y-4">
+                {!videoMetadata ? (
+                  <UploadArea onFileSelect={handleFileSelect} disabled={isGenerating} />
+                ) : (
+                  <>
+                    <VideoInfoCard metadata={videoMetadata} onRemove={handleRemoveVideo} />
+                    <ControlsPanel
+                      config={config}
+                      onChange={setConfig}
+                      onGenerate={handleGenerate}
+                      disabled={!canGenerate}
+                      generating={isGenerating}
+                    />
+                  </>
+                )}
+              </div>
+
+              {/* Right Column: Preview + Export */}
+              <div className="md:col-span-2 space-y-4">
+                {showProgress && (
+                  <ProgressIndicator stage={stage} progress={progress} message={message} />
+                )}
+
+                {gridDataUrl ? (
+                  <>
+                    <GridPreview
+                      dataUrl={gridDataUrl}
+                      zoom={previewZoom}
+                      onZoomChange={setPreviewZoom}
+                    />
+                    <ExportButtons
+                      canvas={gridCanvas}
+                      filename={videoMetadata?.name.replace(/\.[^/.]+$/, '') || 'video'}
+                      disabled={!gridCanvas}
+                    />
+                  </>
+                ) : (
+                  !showProgress && (
+                    <div className="bg-white rounded-xl border border-[#E8E8E5] flex items-center justify-center" style={{ height: '400px' }}>
+                      <div className="text-center">
+                        <div className="text-[#E8E8E5] mb-3">
+                          <GridIcon />
+                        </div>
+                        <p className="text-sm text-[#737370]">
+                          Upload a video to generate a contact sheet
+                        </p>
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          </main>
+
+          {/* Footer */}
+          <footer className="border-t border-[#E8E8E5] bg-white mt-auto">
+            <div className="max-w-4xl mx-auto px-6 py-4">
+              <p className="text-xs text-[#737370] text-center">
+                All processing happens locally in your browser. Your videos never leave your device.
+              </p>
+            </div>
+          </footer>
+        </div>
+      );
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // RENDER
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<FrameGridApp />);
+  </script>
+</body>
+</html>
